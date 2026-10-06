@@ -10,6 +10,11 @@ def match_pinyin(name: str, filt: str) -> bool:
     text = str(name or "").lower()
     if keyword in text:
         return True
+    # Users of a translated UI search by the displayed (translated) name.
+    from src.i18n import tr
+
+    if keyword in tr(str(name or "")).lower():
+        return True
     try:
         from pypinyin import Style, lazy_pinyin
 

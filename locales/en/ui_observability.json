@@ -1,0 +1,5 @@
+{
+ "日志 feature 不能为空": "Log feature cannot be empty",
+ "日志 event 必须是至少两段的小写点分名称，且每段只能包含字母、数字和下划线": "Log event must be a lowercase dot-separated name with at least two segments; each segment may contain only letters, digits and underscores",
+ "{0}失败": "{0} failed"
+}

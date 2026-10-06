@@ -401,6 +401,27 @@ def build_settings_page(
     theme_row.addWidget(light_radio)
     theme_row.addStretch()
     log_card.layout().addLayout(theme_row)
+
+    from src.i18n import SUPPORTED_LANGUAGES, current_language
+
+    language_row = QHBoxLayout()
+    language_row.addWidget(QLabel("界面语言 / Language:"))
+    language_combo = NoWheelComboBox()
+    for code, label in SUPPORTED_LANGUAGES.items():
+        language_combo.addItem(label, code)
+    language_combo.setCurrentIndex(max(0, language_combo.findData(current_language())))
+
+    def select_language(index: int) -> None:
+        if window._set_language_preference(language_combo.itemData(index)):
+            return
+        language_combo.blockSignals(True)
+        language_combo.setCurrentIndex(max(0, language_combo.findData(current_language())))
+        language_combo.blockSignals(False)
+
+    language_combo.currentIndexChanged.connect(select_language)
+    language_row.addWidget(language_combo)
+    language_row.addStretch()
+    log_card.layout().addLayout(language_row)
     layout.addWidget(log_card)
 
     sync_card = _build_capture_diagnostics_card(window)

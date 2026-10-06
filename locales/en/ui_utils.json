@@ -1,0 +1,3 @@
+{
+ "切换日志目录时移除旧日志 sink 失败，继续添加新 sink: {0}\n": "Failed to remove the old log sink when switching log directories; continuing with the new sink: {0}\n"
+}

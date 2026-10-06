@@ -192,6 +192,10 @@ if assets_dir.exists():
     args.append(f"--add-data={assets_dir}{sep}assets")
 if icon_path.exists():
     args.append(f"--icon={icon_path}")
+# Display-language catalogs read by src.i18n at startup.
+locales_dir = ROOT / "locales"
+if locales_dir.is_dir():
+    args.append(f"--add-data={locales_dir}{sep}locales")
 
 
 def _append_add_data(src: str | Path, dst: str):

@@ -64,6 +64,26 @@ class MainWindowThemeMixin:
             return False
         return True
 
+    def _set_language_preference(self, language):
+        from src.i18n import current_language
+
+        if not language or language == current_language():
+            return True
+        box = QMessageBox(self)
+        box.setWindowTitle("重启生效")
+        box.setText("切换界面语言需要重启应用，是否现在重启并应用？")
+        ok_button = box.addButton("好的", QMessageBox.AcceptRole)
+        box.addButton("取消", QMessageBox.RejectRole)
+        box.setDefaultButton(ok_button)
+        box.exec()
+        if box.clickedButton() is not ok_button:
+            return False
+        self._global_theme_settings.save_language(language)
+        if not self._restart_application_as_admin():
+            self._global_theme_settings.save_language(current_language())
+            return False
+        return True
+
     def _prompt_restart_for_theme_change(self):
         box = QMessageBox(self)
         box.setWindowTitle("重启生效")

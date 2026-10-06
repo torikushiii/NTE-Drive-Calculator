@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Callable
 
 from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtGui import QFont, QFontMetrics
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -194,7 +195,10 @@ class RoleSelector(RoleSelectorPreferencesMixin, QWidget):
         return min(columns, 4) if self.width() <= 1320 else columns
 
     def _card_columns(self) -> int:
-        return self._columns_for_width(112, 6)
+        from src.i18n import current_language
+
+        # Translated names ("Lacrimosa") are wider than two or three Chinese characters.
+        return self._columns_for_width(112 if current_language() == "zh" else 136, 6)
 
     def _reflow_for_width(self) -> None:
         self._reflow_pending = False
@@ -262,7 +266,18 @@ class RoleSelector(RoleSelectorPreferencesMixin, QWidget):
         return self._priority_role_name_width() + 106
 
     def _priority_role_name_width(self):
-        return max(54, self.fontMetrics().horizontalAdvance("MMMM") + 18)
+        from src.i18n import current_language, tr
+
+        width = max(54, self.fontMetrics().horizontalAdvance("MMMM") + 18)
+        if current_language() == "zh":
+            return width
+        # Translated names are drawn bold at 13px; size the card for the longest one.
+        font = QFont(self.font())
+        font.setPixelSize(13)
+        font.setBold(True)
+        metrics = QFontMetrics(font)
+        longest = max((metrics.horizontalAdvance(tr(name)) for name in self.all_roles), default=0)
+        return max(width, longest + 18)
 
     def _role_avatar(self, name, size):
         role = self.all_roles.get(name) or {}

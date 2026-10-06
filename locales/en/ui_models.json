@@ -1,0 +1,7 @@
+{
+ "形状 {0} 数据异常: 标定面积为 {1}, 实际矩阵面积为 {2}": "Shape {0} data error: declared area is {1}, actual matrix area is {2}",
+ "驱动 {0} 必须且仅包含 2 条主词条": "Module {0} must contain exactly 2 main stats",
+ "驱动 {0} 副词条不能超过 4 条": "Module {0} cannot have more than 4 substats",
+ "驱动 {0} 面积异常: 物理驱动面积只能是 1~4": "Module {0} area error: a physical Module's area must be 1-4",
+ "卡带 {0} 乘区必须固定为 15 格当量": "Cartridge {0} area must be fixed at 15 cell equivalents"
+}

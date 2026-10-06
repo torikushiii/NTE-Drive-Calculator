@@ -1,0 +1,19 @@
+{
+ "逐表覆盖审计": "Per-Table Coverage Audit",
+ "正式表名": "Official Table Name",
+ "数据领域": "Data Domain",
+ "覆盖状态": "Coverage Status",
+ "只读": "Read-only",
+ "{0} · {1} 行 · 状态 {2}": "{0} · {1} rows · Status {2}",
+ "请选择带来源标识的资料。": "Select a record with a source identifier.",
+ "保留的来源元数据": "Preserved Source Metadata",
+ "点击“加载来源行”后按页读取。": "Click \"Load Source Rows\" to read them page by page.",
+ "加载来源行": "Load Source Rows",
+ "来源路径": "Source Path",
+ "来源行 ID": "Source Row ID",
+ "发行包已省略": "Omitted from release package",
+ "未在此页展示": "Not shown on this page",
+ "加载下一页": "Load Next Page",
+ "已加载全部来源行": "All Source Rows Loaded",
+ "来源元数据": "Source Metadata"
+}

@@ -45,7 +45,13 @@ class SearchableComboBox(NoWheelComboBox):
 
     def refresh_search_items(self):
         self._search_items = [(self.itemText(i), self.itemData(i)) for i in range(self.count())]
-        self._set_completion_items([label for label, _ in self._search_items])
+        self._set_completion_items([self._display_label(label) for label, _ in self._search_items])
+
+    def _display_label(self, label):
+        # A translated UI shows a different label than itemText(); complete on what is shown.
+        index = self.findText(label)
+        shown = self.itemData(index, Qt.DisplayRole) if index >= 0 else None
+        return shown if isinstance(shown, str) else label
 
     def _set_completion_items(self, labels):
         self._completion_model.setStringList(list(labels))
@@ -57,7 +63,7 @@ class SearchableComboBox(NoWheelComboBox):
             self.refresh_search_items()
         text = text.strip()
         filtered = [item for item in self._search_items if match_pinyin(item[0], text)]
-        self._set_completion_items([label for label, _ in (filtered or self._search_items)])
+        self._set_completion_items([self._display_label(label) for label, _ in (filtered or self._search_items)])
         if self.lineEdit():
             self.lineEdit().setFocus(Qt.OtherFocusReason)
             self.lineEdit().setCursorPosition(len(text))
@@ -67,7 +73,7 @@ class SearchableComboBox(NoWheelComboBox):
     def _open_all(self):
         if not self._search_items:
             self.refresh_search_items()
-        self._set_completion_items([label for label, _ in self._search_items])
+        self._set_completion_items([self._display_label(label) for label, _ in self._search_items])
         if self.lineEdit():
             self.lineEdit().setFocus(Qt.OtherFocusReason)
             self.lineEdit().selectAll()
@@ -97,7 +103,7 @@ class SearchableComboBox(NoWheelComboBox):
 
     def _set_current_by_text(self, text):
         for i in range(self.count()):
-            if self.itemText(i) == text or str(self.itemData(i) or "") == text:
+            if text in (self.itemText(i), str(self.itemData(i) or ""), self.itemData(i, Qt.DisplayRole)):
                 self.setCurrentIndex(i)
                 return True
         return False

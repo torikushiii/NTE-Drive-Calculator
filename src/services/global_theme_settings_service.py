@@ -44,8 +44,10 @@ class GlobalThemeSettingsService:
                 dir=str(self.settings_path.parent),
             )
             temporary_path = Path(raw_path)
+            # Keep other preferences (e.g. "language") stored in the same file.
+            preferences = {**(self._read() or {}), "theme": normalized}
             with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
-                json.dump({"theme": normalized}, stream, ensure_ascii=False, indent=2)
+                json.dump(preferences, stream, ensure_ascii=False, indent=2)
                 stream.write("\n")
                 stream.flush()
                 os.fsync(stream.fileno())
@@ -54,6 +56,23 @@ class GlobalThemeSettingsService:
             if temporary_path is not None:
                 temporary_path.unlink(missing_ok=True)
         return normalized
+
+    def load_language(self, default: str) -> str:
+        """Display language shared by every account; applied at next start."""
+        value = (self._read() or {}).get("language")
+        return value if isinstance(value, str) and value else default
+
+    def save_language(self, language: str) -> None:
+        preferences = {**(self._read() or {}), "language": language}
+        self.settings_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = self.settings_path.with_name(f".{self.settings_path.name}.language.tmp")
+        try:
+            temporary_path.write_text(
+                json.dumps(preferences, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+            os.replace(temporary_path, self.settings_path)
+        finally:
+            temporary_path.unlink(missing_ok=True)
 
     def _read(self) -> dict[str, object] | None:
         if not self.settings_path.is_file():

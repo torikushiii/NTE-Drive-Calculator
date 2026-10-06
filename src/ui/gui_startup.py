@@ -54,6 +54,11 @@ def run_gui(APP_CONTEXT, GLOBAL_THEME_SETTINGS, MainWindow, _ensure_admin):
         GLOBAL_THEME_SETTINGS.load(legacy_theme=legacy_theme),
     )
     install_dialog_defaults(app)
+    from src.i18n import DEFAULT_LANGUAGE, install as install_language
+
+    install_language(
+        GLOBAL_THEME_SETTINGS.load_language(DEFAULT_LANGUAGE), APP_CONTEXT.paths.root
+    )
     if APP_CONTEXT.paths.app_icon_path.exists():
         app.setWindowIcon(QIcon(str(APP_CONTEXT.paths.app_icon_path)))
     w = MainWindow()

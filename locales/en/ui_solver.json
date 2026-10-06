@@ -1,0 +1,15 @@
+{
+ "套装总面积 ({0}格) 已超过底盘上限 (20格)！": "Total set area ({0} cells) exceeds the board limit (20 cells)!",
+ "分配图纸组合已取消": "Blueprint combination allocation cancelled",
+ "无法用现有的形状库凑出刚好等于 {0} 格的散件组合！": "Cannot build a filler-piece combination of exactly {0} cells from the available shape library!",
+ "分配图纸摆盘已取消": "Blueprint layout allocation cancelled",
+ "错误：指定的套装 {0} 不存在于官方 SQLite 数据中！可用套装：{1}": "Error: the specified set {0} does not exist in the official SQLite data! Available sets: {1}",
+ "分配图纸生成已取消": "Blueprint generation cancelled",
+ "角色 [{0}] 选择的弧盘名称不能唯一对应正式弧盘 ID": "The Arc name selected for character [{0}] does not map uniquely to a formal Arc ID",
+ "  [卡带分配]\n": "  [Cartridge Allocation]\n",
+ "     - {0} | 评级:[{1}] | 总得分:{2} | 品质:{3} |\n       主词条: {4}\n       副词条: {5}\n": "     - {0} | Grade:[{1}] | Total score:{2} | Quality:{3} |\n       Main stats: {4}\n       Substats: {5}\n",
+ "\n  [套装效果驱动]\n": "\n  [Set Effect Modules]\n",
+ "  [额外散件]\n": "  [Extra Filler Modules]\n",
+ " [先选: 第 {0} 顺位]": " [First pick: No. {0}]",
+ "     - {0} | 评级:[{1}] | 得分:{2} | 品质:{3} | 数值:{4}{5}\n": "     - {0} | Grade:[{1}] | Score:{2} | Quality:{3} | Values:{4}{5}\n"
+}
