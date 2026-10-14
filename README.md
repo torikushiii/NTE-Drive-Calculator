@@ -188,17 +188,53 @@ uv run python tools/quality/run_tests.py core -j 3
 uv run python tools/quality/run_tests.py full
 ```
 
-Build the desktop app:
+### Windows Builds
+
+The Windows release uses PyInstaller to bundle the Python/PySide6 app, then Inno Setup 6 to create the installer. Run the following commands in the repository root on Windows 10/11 x64 with Python 3.11 x64 and the dependencies installed above, including the `build` group.
+
+Packaging requires the release databases, manifests and images under `data/`, including `data/role_catalog/`, plus the approved prebuilt components under `third_party/`. The build does not compile `nte-core.exe`, `nte-analysis-core.exe` or the game DLLs from source. Their matching manifests and license files must be present; missing files, mismatched hashes or incompatible component capabilities stop packaging. See [External Integrations](docs/integrations.md) for the component delivery contracts.
+
+#### Desktop App
+
+Build the default directory bundle:
 
 ```powershell
 uv run python build_exe.py
 ```
 
-Build the installer:
+The executable is `dist/NTE_Drive_Calc/NTE_Drive_Calc.exe`. Distribute the entire `dist/NTE_Drive_Calc/` directory, including `_internal/`, not just the executable. The default build has no console window and requests administrator privileges on launch. Add `--console` to keep a console for diagnostics.
+
+For a single-file bundle instead:
+
+```powershell
+uv run python build_exe.py --onefile
+```
+
+This writes `dist/NTE_Drive_Calc.exe`. Each app build replaces the previous directory and single-file outputs. The installer requires the default directory bundle, so rebuild without `--onefile` before packaging an installer.
+
+#### Installer
+
+Install Inno Setup 6, then build the app and installer together:
 
 ```powershell
 uv run python build_installer.py
 ```
+
+If the default directory bundle is already built, reuse it:
+
+```powershell
+uv run python build_installer.py --skip-app-build
+```
+
+If the Inno Setup compiler is not detected, provide its path explicitly, adjusting it to your installation:
+
+```powershell
+uv run python build_installer.py --skip-app-build --iscc "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+```
+
+Alternatively, set the `INNO_SETUP_ISCC` environment variable to the full path of `ISCC.exe`.
+
+The installer is written to `installer/output/NTE_Drive_Calc_Setup_<version>.exe`, using the version from `src/app/version.py` by default. It includes the ViGEmBus driver installer from `third_party/vigembus/bin/`, with a fallback to the MSI supplied by `vgamepad`. Use `--vigem-installer` to provide an external `.exe` or `.msi` instead.
 
 ## 📑 License & Third-Party Components
 
