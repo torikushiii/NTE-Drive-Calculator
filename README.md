@@ -1,16 +1,16 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/hxwd94666/NTE-Drive-Calc/main/assets/app_icon.png" alt="NTE Drive Calc" width="108">
-<h1>异环驱动计算器</h1>
-<p><strong>NTE Drive Calc</strong></p>
+<img src="assets/app_icon.png" alt="NTE Drive Calc English" width="108">
+<h1>NTE Drive Calc English</h1>
+<p>English edition of <a href="https://github.com/hxwd94666/NTE-Drive-Calculator">NTE Drive Calc</a></p>
 
 Import your *Neverness to Everness* inventory as a computable stock, appraise Modules and Cartridges with algorithms, build loadouts for every character, and equip them automatically.
 
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078d4)](#environment)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776ab)](#development)
-[![Download](https://img.shields.io/badge/download-GitHub%20Release-238636)](https://github.com/hxwd94666/NTE-Drive-Calculator/releases)
-[![Downloads](https://img.shields.io/github/downloads/hxwd94666/NTE-Drive-Calculator/total?label=downloads&color=238636)](https://github.com/hxwd94666/NTE-Drive-Calculator/releases)
-[![Stars](https://img.shields.io/github/stars/hxwd94666/NTE-Drive-Calculator?label=stars&color=f4b400)](https://github.com/hxwd94666/NTE-Drive-Calculator/stargazers)
+[![Download](https://img.shields.io/badge/download-English%20Windows%20build-238636)](https://github.com/torikushiii/NTE-Drive-Calculator-English/releases)
+[![Downloads](https://img.shields.io/github/downloads/torikushiii/NTE-Drive-Calculator-English/total?label=downloads&color=238636)](https://github.com/torikushiii/NTE-Drive-Calculator-English/releases)
+[![Stars](https://img.shields.io/github/stars/torikushiii/NTE-Drive-Calculator-English?label=stars&color=f4b400)](https://github.com/torikushiii/NTE-Drive-Calculator-English/stargazers)
 
 
 [Download](#download) · [Features](#features) · [Quick Start](#quick-start) · [Feedback](#feedback)
@@ -102,14 +102,14 @@ The tool builds a local inventory from screenshot recognition, then combines cha
 
 ## ⬇️ Download & Install
 
-We recommend downloading the latest installer:
+Download the Windows 10/11 x64 installer from [this fork's releases](https://github.com/torikushiii/NTE-Drive-Calculator-English/releases).
+Choose the `NTE_Drive_Calc_English_Setup_*.exe` asset, not GitHub's source-code archives.
 
-- GitHub Release: <https://github.com/hxwd94666/NTE-Drive-Calculator/releases>
-- MirrorChyan (paid): <https://mirrorchyan.com/zh/projects?rid=NTE-Drive-Calc&channel=stable>
-- Quark Drive (free): <https://pan.quark.cn/s/82f16b845aec>
-- Baidu Netdisk (free): <https://pan.baidu.com/s/1sPVqCpzmkQwKYCGstcZuIQ?pwd=ygke>
-- Xunlei Drive (free): <https://pan.xunlei.com/s/VP0W_ptzSZwkVamy2UvF_CliA1?pwd=2hb6#>
-> Saving each update to your own cloud drive earns the author a small commission, and saving from the mobile app earns more; you can treat this as a way to support the project without spending anything.
+The installer and application default to English and install separately from the upstream edition.
+English builds are initially published as prereleases while Windows/game acceptance is pending.
+The `SHA256SUMS.txt` asset records the installer checksum.
+In-app downloads and update checks use this fork, including its English prereleases;
+the upstream MirrorChyan and cloud-drive downloads are not used.
 
 During installation, we recommend leaving `Install ViGEmBus virtual gamepad driver` checked. The scanning feature needs a virtual gamepad driver to simulate inventory page-turning.
 
@@ -156,7 +156,8 @@ If you run into a recognition error, a failed installation, a scanning problem o
 
 Where to report:
 
-- GitHub Issues: <https://github.com/hxwd94666/NTE-Drive-Calc/issues>
+- English edition issues: <https://github.com/torikushiii/NTE-Drive-Calculator-English/issues>
+- Upstream project: <https://github.com/hxwd94666/NTE-Drive-Calculator>
 
 <a id="development"></a>
 
@@ -189,6 +190,12 @@ uv run python tools/quality/run_tests.py full
 ```
 
 ### Windows Builds
+
+Maintainers can run **Build English Windows release** from this fork's GitHub Actions tab.
+Leave `publish` off for a build artifact only; enable it to publish an English prerelease after
+the existing packaging/component checks succeed. This workflow does not run the test suite or
+interactive Windows/game acceptance. Increment `ENGLISH_RELEASE_REVISION` in `src/app/version.py`
+for another English build of the same upstream version. See [English-edition internals](docs/i18n.md).
 
 The Windows release uses PyInstaller to bundle the Python/PySide6 app, then Inno Setup 6 to create the installer. Run the following commands in the repository root on Windows 10/11 x64 with Python 3.11 x64 and the dependencies installed above, including the `build` group.
 

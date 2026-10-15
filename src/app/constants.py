@@ -1,14 +1,17 @@
 # 集中定义应用版本、链接和说明文案常量。
 """Application constants shared by UI and feature modules."""
 
-from src.app.version import __version__
+from src.app.version import ENGLISH_RELEASE_VERSION
 
 
-APP_VERSION = __version__
+APP_VERSION = ENGLISH_RELEASE_VERSION
 ALLOCATION_TOTAL_SCORE_AREA = 35
-GITHUB_HOME_URL = "https://github.com/hxwd94666/NTE-Drive-Calculator"
+GITHUB_REPOSITORY = "torikushiii/NTE-Drive-Calculator-English"
+GITHUB_HOME_URL = f"https://github.com/{GITHUB_REPOSITORY}"
 GITHUB_RELEASES_URL = GITHUB_HOME_URL + "/releases"
-GITHUB_LATEST_RELEASE_URL = GITHUB_RELEASES_URL + "/latest"
+# GitHub's /latest excludes prereleases, including the first English build.
+GITHUB_LATEST_RELEASE_URL = GITHUB_RELEASES_URL
+GITHUB_RELEASES_API_URL = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases?per_page=100"
 MIRROR_UPDATE_API = "https://mirrorchyan.com/api/resources/NTE-Drive-Calc/latest"
 MIRROR_PROJECT_URL = "https://mirrorchyan.com/zh/projects?rid=NTE-Drive-Calc&channel=stable"
 BILIBILI_HOME_URL = "https://b23.tv/nXJGdh3"

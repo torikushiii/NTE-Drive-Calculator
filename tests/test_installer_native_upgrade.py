@@ -14,6 +14,9 @@ def test_upgrade_cleans_application_proxy_only_for_native_bundle(tmp_path, monke
     monkeypatch.setattr(build_installer, "inspect_game_component_bundle", lambda _path: SimpleNamespace(layout=layout))
     build_installer._write_iss("2.2.4", tmp_path / "driver.exe", True)
     script = build_installer.ISS_PATH.read_text(encoding="utf-8-sig")
+    assert 'AppId={{B92BD7AC-F0C9-46F9-941E-30630243D158}' in script
+    assert 'DefaultDirName={autopf}\\NTE Drive Calc English' in script
+    assert 'Name: "english"; MessagesFile: "compiler:Default.isl"' in script
     deletes = script.split("[InstallDelete]", 1)[1].split("[Dirs]", 1)[0]
     assert ('Type: files; Name: "{app}\\_internal\\dwmapi.dll"' in deletes) == (layout == "native-capture-v1")
     expected = {"icuuc.dll", "icudt78.dll"} | ({"dwmapi.dll"} if layout == "native-capture-v1" else set())

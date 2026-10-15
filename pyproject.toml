@@ -44,9 +44,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/hxwd94666/NTE-Drive-Calc"
-Issues = "https://github.com/hxwd94666/NTE-Drive-Calc/issues"
-Releases = "https://github.com/hxwd94666/NTE-Drive-Calc/releases"
+Homepage = "https://github.com/torikushiii/NTE-Drive-Calculator-English"
+Issues = "https://github.com/torikushiii/NTE-Drive-Calculator-English/issues"
+Releases = "https://github.com/torikushiii/NTE-Drive-Calculator-English/releases"
 
 [dependency-groups]
 build = [

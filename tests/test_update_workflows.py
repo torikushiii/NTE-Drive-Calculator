@@ -1,4 +1,4 @@
-# 覆盖更新检查、Mirror 响应与安装包下载行为。
+# 覆盖英文分支发行版检查与安装包下载行为。
 
 import os
 import tempfile
@@ -27,7 +27,6 @@ class UpdateWorkflowTests(unittest.TestCase):
             GITHUB_LATEST_RELEASE_URL,
             GROUP_CHAT_DEVELOPER_HINT,
             GROUP_CHAT_DISCORD_HINT,
-            MIRROR_PROJECT_URL,
             QQ_GROUP_NUMBER,
             SUPPORT_US_URL,
         )
@@ -52,14 +51,10 @@ class UpdateWorkflowTests(unittest.TestCase):
             opened,
         )
         self.assertEqual(
-            "https://github.com/hxwd94666/NTE-Drive-Calculator/releases/latest",
+            "https://github.com/torikushiii/NTE-Drive-Calculator-English/releases",
             GITHUB_LATEST_RELEASE_URL,
         )
         self.assertEqual("https://afdian.com/a/hxwd94666", SUPPORT_US_URL)
-        self.assertEqual(
-            "https://mirrorchyan.com/zh/projects?rid=NTE-Drive-Calc&channel=stable",
-            MIRROR_PROJECT_URL,
-        )
         self.assertEqual("1029030672", QQ_GROUP_NUMBER)
         self.assertEqual("若想加入开发群，请先入本群私聊群主", GROUP_CHAT_DEVELOPER_HINT)
         self.assertEqual("获取开发动态，也可在这里交流。", GROUP_CHAT_DISCORD_HINT)
@@ -87,7 +82,7 @@ class UpdateWorkflowTests(unittest.TestCase):
                 return None
 
             @staticmethod
-            def _start_mirror_download():
+            def _start_update_download():
                 return None
 
         window = Window()
@@ -179,73 +174,73 @@ class UpdateWorkflowTests(unittest.TestCase):
             button.click()
         self.assertEqual([url for _name, url in links], opened)
 
-    def test_mirror_download_failure_link_opens_the_project_page(self):
-        from src.app.constants import MIRROR_PROJECT_URL
+    def test_update_download_failure_link_opens_the_project_page(self):
+        from src.app.constants import GITHUB_RELEASES_URL
         from src.ui.controllers import update_controller
 
-        link_text = update_controller._mirror_project_link_text("尝试下载")
+        link_text = update_controller._update_project_link_text("尝试下载")
 
-        self.assertIn("Mirror 项目页面尝试下载", link_text)
-        self.assertIn(f'href="{MIRROR_PROJECT_URL}"', link_text)
-        self.assertIn(MIRROR_PROJECT_URL, link_text)
+        self.assertIn("GitHub English releases", link_text)
+        self.assertIn(f'href="{GITHUB_RELEASES_URL}"', link_text)
+        self.assertNotIn("mirrorchyan", link_text)
 
-    def test_mirror_download_only_allows_current_or_newer_release(self):
+    def test_update_download_only_allows_current_or_newer_release(self):
         from src.ui.controllers import update_controller
 
         self.assertTrue(
-            update_controller._mirror_download_version_is_available("v2.1.0", "v2.1.0")
+            update_controller._update_download_version_is_available("v2.1.0", "v2.1.0")
         )
         self.assertTrue(
-            update_controller._mirror_download_version_is_available("v2.1.1", "v2.1.0")
+            update_controller._update_download_version_is_available("v2.1.1", "v2.1.0")
         )
         self.assertFalse(
-            update_controller._mirror_download_version_is_available("v2.0.9", "v2.1.0")
+            update_controller._update_download_version_is_available("v2.0.9", "v2.1.0")
         )
 
-    def test_mirror_older_version_download_requires_explicit_choice(self):
+    def test_update_older_version_download_requires_explicit_choice(self):
         from src.ui.controllers import update_controller
 
         class Window(QWidget):
             def __init__(self):
                 super().__init__()
                 self._update_status = QLabel()
-                self._mirror_download_btn = QPushButton()
+                self._update_download_btn = QPushButton()
                 self.downloads = []
 
-            def _start_mirror_installer_download(self, url):
+            def _start_update_installer_download(self, url):
                 self.downloads.append(url)
 
         window = Window()
         info = {"latest": "2.2.0", "url": "https://example.invalid/setup.exe"}
         with patch.object(update_controller, "APP_VERSION", "2.3.0"), \
                 patch.object(update_controller, "log_event"), \
-                patch.object(update_controller, "_confirm_mirror_older_version_download", return_value=False) as confirm:
-            window._mirror_download_btn.setEnabled(False)
-            update_controller._on_mirror_download_ready(window, info)
+                patch.object(update_controller, "_confirm_update_older_version_download", return_value=False) as confirm:
+            window._update_download_btn.setEnabled(False)
+            update_controller._on_update_download_ready(window, info)
             confirm.assert_called_once_with(window, "2.3.0", "2.2.0")
             self.assertEqual([], window.downloads)
-            self.assertTrue(window._mirror_download_btn.isEnabled())
+            self.assertTrue(window._update_download_btn.isEnabled())
             self.assertEqual("已取消较旧版本下载。", window._update_status.text())
 
         with patch.object(update_controller, "APP_VERSION", "2.3.0"), \
                 patch.object(update_controller, "log_event"), \
-                patch.object(update_controller, "_confirm_mirror_older_version_download", return_value=True):
-            window._mirror_download_btn.setEnabled(False)
-            update_controller._on_mirror_download_ready(window, info)
+                patch.object(update_controller, "_confirm_update_older_version_download", return_value=True):
+            window._update_download_btn.setEnabled(False)
+            update_controller._on_update_download_ready(window, info)
             self.assertEqual([info["url"]], window.downloads)
-            self.assertFalse(window._mirror_download_btn.isEnabled())
+            self.assertFalse(window._update_download_btn.isEnabled())
 
         with patch.object(update_controller, "APP_VERSION", "2.3.0"), \
                 patch.object(update_controller, "log_event"), \
-                patch.object(update_controller, "_confirm_mirror_older_version_download") as confirm:
-            update_controller._on_mirror_download_ready(
+                patch.object(update_controller, "_confirm_update_older_version_download") as confirm:
+            update_controller._on_update_download_ready(
                 window, {"latest": "2.3.0", "url": "https://example.invalid/current.exe"},
             )
             confirm.assert_not_called()
             self.assertEqual("https://example.invalid/current.exe", window.downloads[-1])
         window.deleteLater()
 
-    def test_mirror_older_version_dialog_has_download_and_default_cancel(self):
+    def test_update_older_version_dialog_has_download_and_default_cancel(self):
         from src.ui.controllers import update_controller
 
         owner = QWidget()
@@ -263,10 +258,10 @@ class UpdateWorkflowTests(unittest.TestCase):
 
         choices.extend(("取消", "下载"))
         with patch.object(QMessageBox, "exec", choose), patch.object(QApplication, "beep"):
-            self.assertFalse(update_controller._confirm_mirror_older_version_download(
+            self.assertFalse(update_controller._confirm_update_older_version_download(
                 owner, "2.3.0", "2.2.0",
             ))
-            self.assertTrue(update_controller._confirm_mirror_older_version_download(
+            self.assertTrue(update_controller._confirm_update_older_version_download(
                 owner, "2.3.0", "2.2.0",
             ))
         owner.deleteLater()
@@ -315,7 +310,7 @@ class UpdateWorkflowTests(unittest.TestCase):
         window = Window()
         app_module.MainWindow._on_update_error(window, "timeout")
 
-        self.assertIn("Mirror 酱", window._update_status.text)
+        self.assertIn("GitHub", window._update_status.text)
         self.assertEqual([], window.prompts)
 
     def test_update_network_failure_returns_user_facing_result(self):
@@ -337,10 +332,10 @@ class UpdateWorkflowTests(unittest.TestCase):
         self.assertFalse(info["has_release"])
         self.assertFalse(info["newer"])
         self.assertEqual("", info["url"])
-        self.assertEqual("Mirror 酱更新服务请求失败，请稍后重试。", info["message"])
+        self.assertEqual(updates.UPDATE_FAILURE_MESSAGE, info["message"])
         self.assertNotIn("Traceback", info["message"])
 
-    def test_mirror_error_code_returns_user_facing_result(self):
+    def test_non_github_response_returns_user_facing_result(self):
         from src.features.settings import updates
 
         original_urlopen = updates.urllib.request.urlopen
@@ -367,9 +362,9 @@ class UpdateWorkflowTests(unittest.TestCase):
 
         self.assertFalse(info["has_release"])
         self.assertTrue(info["error"])
-        self.assertEqual("CDK 无效", info["message"])
+        self.assertEqual(updates.UPDATE_FAILURE_MESSAGE, info["message"])
 
-    def test_mirror_update_response_includes_version_notes_and_download_url(self):
+    def test_github_response_includes_version_notes_and_download_url(self):
         from src.features.settings import updates
 
         class Response:
@@ -381,9 +376,12 @@ class UpdateWorkflowTests(unittest.TestCase):
 
             def read(self):
                 return (
-                    '{"code":0,"msg":"success","data":{'
-                    '"version_name":"v2.1.0","url":"https://download.example/file",'
-                    '"release_note":"修复配装页面"}}'
+                    '[{"tag_name":"v2.1.0-english.1","prerelease":true,'
+                    '"body":"修复配装页面","assets":[{'
+                    '"name":"NTE_Drive_Calc_English_Setup_2.1.0-english.1.exe",'
+                    '"state":"uploaded","browser_download_url":'
+                    '"https://github.com/torikushiii/NTE-Drive-Calculator-English/'
+                    'releases/download/v2.1.0-english.1/setup.exe"}]}]'
                 ).encode("utf-8")
 
         original_urlopen = updates.urllib.request.urlopen
@@ -397,9 +395,8 @@ class UpdateWorkflowTests(unittest.TestCase):
         updates.urllib.request.urlopen = fake_urlopen
         try:
             info = updates.fetch_update_info(
-                "https://mirrorchyan.com/api/resources/NTE-Drive-Calc/latest",
+                "https://api.github.com/repos/torikushiii/NTE-Drive-Calculator-English/releases",
                 "2.0.0",
-                cdk="0001bf xxxxxx",
                 timeout=1,
             )
         finally:
@@ -407,15 +404,15 @@ class UpdateWorkflowTests(unittest.TestCase):
 
         self.assertTrue(info["has_release"])
         self.assertTrue(info["newer"])
-        self.assertEqual("v2.1.0", info["latest"])
-        self.assertEqual("https://download.example/file", info["url"])
+        self.assertEqual("2.1.0-english.1", info["latest"])
+        self.assertIn("NTE-Drive-Calculator-English/releases/download/", info["url"])
         self.assertEqual("修复配装页面", info["message"])
         self.assertEqual(
-            "https://mirrorchyan.com/api/resources/NTE-Drive-Calc/latest?current_version=2.0.0&cdk=0001bf+xxxxxx",
+            "https://api.github.com/repos/torikushiii/NTE-Drive-Calculator-English/releases",
             requested_urls[0],
         )
 
-    def test_mirror_installer_download_writes_valid_exe_and_reports_progress(self):
+    def test_update_installer_download_writes_valid_exe_and_reports_progress(self):
         from src.features.settings import updates
 
         class Response:
@@ -452,7 +449,7 @@ class UpdateWorkflowTests(unittest.TestCase):
         self.assertEqual((0, 8), updates_progress[0])
         self.assertEqual((8, 8), updates_progress[-1])
 
-    def test_mirror_installer_download_removes_partial_file_when_cancelled(self):
+    def test_update_installer_download_removes_partial_file_when_cancelled(self):
         from src.features.settings import updates
 
         class Response:
@@ -486,15 +483,15 @@ class UpdateWorkflowTests(unittest.TestCase):
         finally:
             updates.urllib.request.urlopen = original_urlopen
 
-    def test_update_check_uses_mirror_without_cdk_and_keeps_github_release_link(self):
+    def test_update_check_uses_the_fork_and_keeps_the_specific_release_link(self):
         from src.ui.controllers import update_controller
 
         captured = {}
         original_fetch = update_controller.fetch_update_info
 
-        def fake_fetch(api_url, version, *, cdk=""):
-            captured.update(api_url=api_url, version=version, cdk=cdk)
-            return {"has_release": True, "latest": "v2.0.1"}
+        def fake_fetch(api_url, version):
+            captured.update(api_url=api_url, version=version)
+            return {"has_release": True, "latest": "2.3.1-english.2", "release_url": "https://example.invalid/tag"}
 
         class Window:
             pass
@@ -505,9 +502,8 @@ class UpdateWorkflowTests(unittest.TestCase):
         finally:
             update_controller.fetch_update_info = original_fetch
 
-        self.assertEqual("", captured["cdk"])
-        self.assertIn("mirrorchyan.com/api/resources/NTE-Drive-Calc/latest", captured["api_url"])
-        self.assertTrue(info["release_url"].endswith("/releases"))
+        self.assertIn("api.github.com/repos/torikushiii/NTE-Drive-Calculator-English/releases", captured["api_url"])
+        self.assertEqual("https://example.invalid/tag", info["release_url"])
 
 
 

@@ -1,5 +1,5 @@
 # 从 MainWindow 抽离的更新控制器方法。
-"""Compatibility-installed MirrorChyan update controller."""
+"""Fork-only English release checks and installer downloads."""
 
 from __future__ import annotations
 
@@ -33,8 +33,7 @@ from src.app.constants import (
     GITHUB_HOME_URL,
     GITHUB_LATEST_RELEASE_URL,
     GITHUB_RELEASES_URL,
-    MIRROR_PROJECT_URL,
-    MIRROR_UPDATE_API,
+    GITHUB_RELEASES_API_URL,
     QQ_GROUP_NUMBER,
     SUPPORT_US_URL,
 )
@@ -49,6 +48,7 @@ from src.features.settings.updates import (
     is_newer_version,
     should_show_startup_update,
     show_update_dialog,
+    UPDATE_FAILURE_MESSAGE,
 )
 from src.utils.logger import logger
 
@@ -72,7 +72,7 @@ def _new_update_operation(
     )
 
 
-class _MirrorInstallerDownloadWorker(WorkerThread):
+class _InstallerDownloadWorker(WorkerThread):
     progress = Signal(int, int)
 
     def __init__(self, url: str, parent: QObject | None = None) -> None:
@@ -102,21 +102,6 @@ def _maybe_check_updates_on_startup(self):
     QTimer.singleShot(1200, check_when_idle)
 
 
-def _mirror_cdk_value(self):
-    editor = getattr(self, "_mirror_cdk_edit", None)
-    if editor is not None:
-        return editor.text().strip()
-    return str(self._update_config.get("mirror_cdk") or "").strip()
-
-
-def _save_mirror_cdk(self):
-    cdk = self._mirror_cdk_value()
-    if self._update_config.get("mirror_cdk") != cdk:
-        self._update_config["mirror_cdk"] = cdk
-        self._save_update_config()
-    return cdk
-
-
 def _check_updates(self, manual=True):
     update_worker = getattr(self, "_update_worker", None)
     if update_worker is not None and update_worker.isRunning():
@@ -135,7 +120,7 @@ def _check_updates(self, manual=True):
     )
     if manual:
         self._check_update_btn.setEnabled(False)
-        self._update_status.setText("正在通过 Mirror 酱检查更新…")
+        self._update_status.setText("Checking English releases on GitHub...")
     self._update_worker = WorkerThread(
         target=self._fetch_update_info, parent=self,
     )
@@ -144,11 +129,8 @@ def _check_updates(self, manual=True):
     self._update_worker.start()
 
 
-def _fetch_update_info(self, cdk=""):
-    info = fetch_update_info(MIRROR_UPDATE_API, APP_VERSION, cdk=cdk)
-    if info.get("has_release"):
-        info["release_url"] = GITHUB_RELEASES_URL
-    return info
+def _fetch_update_info(self):
+    return fetch_update_info(GITHUB_RELEASES_API_URL, APP_VERSION)
 
 
 def _on_update_checked(self, info):
@@ -169,7 +151,7 @@ def _on_update_checked(self, info):
     if manual:
         self._check_update_btn.setEnabled(True)
     if not info.get("has_release"):
-        message = info.get("message") or "Mirror 酱未返回可用更新信息。"
+        message = info.get("message") or UPDATE_FAILURE_MESSAGE
         self._update_status.setText(message)
         if manual:
             self._show_update_failure_netdisk_prompt(info.get("error", message))
@@ -214,7 +196,7 @@ def _on_update_error(self, err):
         trigger="manual" if manual else "startup",
         error=err,
     )
-    message = "Mirror 酱更新服务请求失败，请稍后重试。"
+    message = UPDATE_FAILURE_MESSAGE
     if manual:
         self._check_update_btn.setEnabled(True)
         self._update_status.setText(message)
@@ -225,43 +207,35 @@ def _on_update_error(self, err):
         logger.warning("启动自动检查更新失败: {}", err)
 
 
-def _start_mirror_download(self):
-    download_worker = getattr(self, "_mirror_download_worker", None)
+def _start_update_download(self):
+    download_worker = getattr(self, "_update_download_worker", None)
     if download_worker is not None and download_worker.isRunning():
         return
-    cdk = self._save_mirror_cdk()
-    if not cdk:
-        _show_mirror_cdk_required_dialog(self)
-        editor = getattr(self, "_mirror_cdk_edit", None)
-        if editor is not None:
-            editor.setFocus()
-        return
-    self._mirror_download_operation_context = _new_update_operation(
+    self._update_download_operation_context = _new_update_operation(
         self, feature="update_download"
     )
     log_event(
         "INFO",
         "update.download_request_started",
-        "开始请求 Mirror 下载",
-        self._mirror_download_operation_context,
-        cdk_present=True,
+        "Request English installer from GitHub",
+        self._update_download_operation_context,
     )
-    self._mirror_download_btn.setEnabled(False)
-    self._update_status.setText("正在向 Mirror 酱请求下载地址…")
-    self._mirror_download_worker = WorkerThread(
-        target=lambda: self._fetch_update_info(cdk), parent=self,
+    self._update_download_btn.setEnabled(False)
+    self._update_status.setText("Requesting English installer from GitHub...")
+    self._update_download_worker = WorkerThread(
+        target=self._fetch_update_info, parent=self,
     )
-    self._mirror_download_worker.result_ready.connect(self._on_mirror_download_ready)
-    self._mirror_download_worker.error.connect(
-        lambda error: self._on_mirror_download_ready({"error": str(error)})
+    self._update_download_worker.result_ready.connect(self._on_update_download_ready)
+    self._update_download_worker.error.connect(
+        lambda error: self._on_update_download_ready({"error": str(error)})
     )
-    self._mirror_download_worker.start()
+    self._update_download_worker.start()
 
 
-def _on_mirror_download_ready(self, info):
+def _on_update_download_ready(self, info):
     operation = getattr(
         self,
-        "_mirror_download_operation_context",
+        "_update_download_operation_context",
         _new_update_operation(self, feature="update_download"),
     )
     url = str(info.get("url") or "").strip()
@@ -269,23 +243,23 @@ def _on_mirror_download_ready(self, info):
     if url and not latest:
         url = ""
     if url:
-        if not _mirror_download_version_is_available(latest, APP_VERSION):
+        if not _update_download_version_is_available(latest, APP_VERSION):
             log_event(
                 "WARNING",
                 "update.download_historical_version_confirmation_required",
-                "Mirror 下载版本低于当前版本，等待用户确认",
+                "English installer is older than the current version; confirmation required",
                 operation,
                 current_version=APP_VERSION,
                 latest_version=latest,
             )
-            if not _confirm_mirror_older_version_download(self, APP_VERSION, latest):
+            if not _confirm_update_older_version_download(self, APP_VERSION, latest):
                 log_event(
                     "INFO", "update.download_historical_version_cancelled",
                     "用户取消下载较旧版本", operation,
                     current_version=APP_VERSION, latest_version=latest,
                 )
-                if hasattr(self, "_mirror_download_btn"):
-                    self._mirror_download_btn.setEnabled(True)
+                if hasattr(self, "_update_download_btn"):
+                    self._update_download_btn.setEnabled(True)
                 self._update_status.setText("已取消较旧版本下载。")
                 return
             log_event(
@@ -296,51 +270,50 @@ def _on_mirror_download_ready(self, info):
         log_event(
             "INFO",
             "update.download_url_received",
-            "已获取 Mirror 下载地址",
+            "已获取 GitHub 下载地址",
             operation,
             has_download_url=True,
         )
-        self._start_mirror_installer_download(url)
+        self._start_update_installer_download(url)
         return
     log_event(
         "ERROR",
         "update.download_request_failed",
-        "未获取到 Mirror 下载地址",
+        "未获取到 GitHub 下载地址",
         operation,
         error=info.get("message") or info.get("error"),
     )
-    if hasattr(self, "_mirror_download_btn"):
-        self._mirror_download_btn.setEnabled(True)
-    self._update_status.setText("未获取到 Mirror 下载地址，可前往项目页面尝试下载。")
-    _show_mirror_project_download_dialog(
+    if hasattr(self, "_update_download_btn"):
+        self._update_download_btn.setEnabled(True)
+    self._update_status.setText("No English installer found. Open the GitHub releases page.")
+    _show_update_project_download_dialog(
         self,
-        "未获取到 Mirror 下载地址。请确认 CDK 有效，且存在可下载的新版本；"
-        "若仍无法下载，可前往下方项目页面尝试下载。",
+        "No English installer could be downloaded. Please try the fork's GitHub releases page below.",
     )
 
 
-def _start_mirror_installer_download(self, url):
+def _start_update_installer_download(self, url):
     """Download and launch the installer without sending the user to a browser."""
-    self._update_status.setText("正在通过 Mirror 酱下载更新安装程序…")
+    self._update_status.setText("Downloading English installer from GitHub...")
     progress = QProgressDialog("正在下载更新安装程序…", "取消", 0, 0, self)
-    progress.setWindowTitle("Mirror 下载")
+    progress.setWindowTitle("English installer download")
     progress.setWindowModality(Qt.WindowModality.WindowModal)
     progress.setAutoClose(False)
     progress.setAutoReset(False)
     progress.setMinimumDuration(0)
     progress.show()
-    self._mirror_download_progress_dialog = progress
-    worker = _MirrorInstallerDownloadWorker(str(url), parent=self)
-    self._mirror_installer_download_worker = worker
+    self._update_download_progress_dialog = progress
+    worker = _InstallerDownloadWorker(str(url), parent=self)
+    self._update_installer_download_worker = worker
     progress.canceled.connect(worker.cancel)
-    worker.progress.connect(self._on_mirror_download_progress)
-    worker.result_ready.connect(self._on_mirror_installer_downloaded)
-    worker.error.connect(self._on_mirror_installer_download_error)
+    worker.progress.connect(self._on_update_download_progress)
+    worker.result_ready.connect(self._on_update_installer_downloaded)
+    worker.error.connect(self._on_update_installer_download_error)
     worker.start()
 
 
-def _on_mirror_download_progress(self, downloaded, total):
-    progress = getattr(self, "_mirror_download_progress_dialog", None)
+def _on_update_download_progress(self, downloaded, total):
+    progress = getattr(self, "_update_download_progress_dialog", None)
     if progress is None:
         return
     if total > 0:
@@ -352,89 +325,89 @@ def _on_mirror_download_progress(self, downloaded, total):
         progress.setLabelText(f"正在下载更新安装程序… {downloaded / 1024 / 1024:.1f} MB")
 
 
-def _finish_mirror_download_ui(self):
-    progress = getattr(self, "_mirror_download_progress_dialog", None)
+def _finish_update_download_ui(self):
+    progress = getattr(self, "_update_download_progress_dialog", None)
     if progress is not None:
         progress.close()
         progress.deleteLater()
-    self._mirror_download_progress_dialog = None
-    if hasattr(self, "_mirror_download_btn"):
-        self._mirror_download_btn.setEnabled(True)
+    self._update_download_progress_dialog = None
+    if hasattr(self, "_update_download_btn"):
+        self._update_download_btn.setEnabled(True)
 
 
-def _on_mirror_installer_downloaded(self, result):
-    self._finish_mirror_download_ui()
+def _on_update_installer_downloaded(self, result):
+    self._finish_update_download_ui()
     operation = getattr(
         self,
-        "_mirror_download_operation_context",
+        "_update_download_operation_context",
         _new_update_operation(self, feature="update_download"),
     )
     path = Path(str((result or {}).get("path") or ""))
     if not path.is_file():
-        self._on_mirror_installer_download_error("安装程序下载完成后未找到文件。")
+        self._on_update_installer_download_error("安装程序下载完成后未找到文件。")
         return
     log_event(
         "INFO",
         "update.download_succeeded",
-        "Mirror 安装程序下载完成",
+        "GitHub 安装程序下载完成",
         operation,
         installer_name=path.name,
     )
     self._update_status.setText("安装程序下载完成，正在自动启动…")
-    QTimer.singleShot(150, lambda: self._launch_mirror_installer(str(path)))
+    QTimer.singleShot(150, lambda: self._launch_update_installer(str(path)))
 
 
-def _on_mirror_installer_download_error(self, error):
-    self._finish_mirror_download_ui()
+def _on_update_installer_download_error(self, error):
+    self._finish_update_download_ui()
     message = str(error or "安装程序下载失败，请稍后重试。")
     operation = getattr(
         self,
-        "_mirror_download_operation_context",
+        "_update_download_operation_context",
         _new_update_operation(self, feature="update_download"),
     )
     if "已取消更新下载安装包" in message:
         log_event(
             "WARNING",
             "update.download_cancelled",
-            "用户取消 Mirror 下载",
+            "用户取消 GitHub 下载",
             operation,
         )
-        self._update_status.setText("已取消 Mirror 下载。")
+        self._update_status.setText("English installer download cancelled.")
         return
     log_event(
         "ERROR",
         "update.download_failed",
-        "Mirror 安装程序下载失败",
+        "GitHub 安装程序下载失败",
         operation,
         error=message,
     )
-    self._update_status.setText("Mirror 下载失败，可前往项目页面尝试下载。")
-    _show_mirror_project_download_dialog(
+    self._update_status.setText("Download failed. Please try the GitHub releases page.")
+    _show_update_project_download_dialog(
         self,
         "下载或启动安装程序失败，请稍后重试；若仍失败，可前往下方项目页面尝试下载。",
     )
 
 
-def _launch_mirror_installer(self, path):
+def _launch_update_installer(self, path):
     installer = Path(path)
     if not installer.is_file():
-        self._on_mirror_installer_download_error("安装程序文件不存在。")
+        self._on_update_installer_download_error("安装程序文件不存在。")
         return
     try:
         subprocess.Popen([str(installer)], cwd=str(installer.parent))
     except OSError as exc:
-        self._on_mirror_installer_download_error(str(exc))
+        self._on_update_installer_download_error(str(exc))
         return
     self._update_status.setText("安装程序已启动，当前程序即将退出。")
     operation = getattr(
         self,
-        "_mirror_download_operation_context",
+        "_update_download_operation_context",
         _new_update_operation(self, feature="update_download"),
     )
     log_event(
         "INFO",
         "update.installer_launched",
-        "Mirror 更新安装程序已启动",
+        "GitHub 更新安装程序已启动",
         operation,
         installer_name=installer.name,
     )
@@ -443,50 +416,27 @@ def _launch_mirror_installer(self, path):
         QTimer.singleShot(250, application.quit)
 
 
-def _show_mirror_cdk_required_dialog(self):
-    dialog = QDialog(self)
-    dialog.setWindowTitle("Mirror 下载")
-    dialog.setMinimumWidth(460)
-    if hasattr(self, "_current_style_sheet"):
-        dialog.setStyleSheet(self._current_style_sheet())
-    layout = QVBoxLayout(dialog)
-    layout.setContentsMargins(18, 16, 18, 16)
-    layout.setSpacing(10)
-    message = QLabel("请先填写 Mirror CDK 后再下载。<br><br>" + _mirror_project_link_text("获取 CDK"))
-    message.setWordWrap(True)
-    message.setTextFormat(Qt.TextFormat.RichText)
-    message.setOpenExternalLinks(True)
-    message.setTextInteractionFlags(
-        Qt.TextInteractionFlag.TextBrowserInteraction
-    )
-    layout.addWidget(message)
-    buttons = QDialogButtonBox(QDialogButtonBox.Ok)
-    buttons.accepted.connect(dialog.accept)
-    layout.addWidget(buttons)
-    dialog.exec()
-
-
-def _mirror_project_link_text(action: str) -> str:
-    """Return the visible, clickable Mirror project link used by download dialogs."""
+def _update_project_link_text(action: str) -> str:
+    """Return the fork's browser-openable download fallback."""
     return (
-        f"可前往 Mirror 项目页面{action}："
-        f'<a href="{MIRROR_PROJECT_URL}">{MIRROR_PROJECT_URL}</a>'
+        f"GitHub English releases ({action}): "
+        f'<a href="{GITHUB_RELEASES_URL}">{GITHUB_RELEASES_URL}</a>'
     )
 
 
-def _mirror_download_version_is_available(latest: str, current: str) -> bool:
+def _update_download_version_is_available(latest: str, current: str) -> bool:
     """Whether the remote release is current or newer; older ones need confirmation."""
     return bool(latest) and not is_newer_version(current, latest)
 
 
-def _confirm_mirror_older_version_download(self: Any, current: str, latest: str) -> bool:
+def _confirm_update_older_version_download(self: Any, current: str, latest: str) -> bool:
     dialog = QMessageBox(self)
     dialog.setIcon(QMessageBox.Icon.Warning)
-    dialog.setWindowTitle("Mirror 下载较旧版本")
-    dialog.setText("Mirror 提供的版本低于当前安装版本。")
+    dialog.setWindowTitle("Download older English release")
+    dialog.setText("The English installer is older than the installed version.")
     dialog.setInformativeText(
-        f"当前版本：{current}\nMirror 版本：{latest}\n"
-        "下载完成后会自动启动安装程序，可能覆盖当前版本。是否继续下载？"
+        f"Installed: {current}\nGitHub release: {latest}\n"
+        "The installer will launch after downloading and may replace this version. Continue?"
     )
     download = dialog.addButton("下载", QMessageBox.ButtonRole.AcceptRole)
     cancel = dialog.addButton("取消", QMessageBox.ButtonRole.RejectRole)
@@ -500,10 +450,10 @@ def _confirm_mirror_older_version_download(self: Any, current: str, latest: str)
     return dialog.clickedButton() is download
 
 
-def _show_mirror_project_download_dialog(self: Any, summary: str) -> None:
-    """Show a download failure with a direct, browser-openable Mirror link."""
+def _show_update_project_download_dialog(self: Any, summary: str) -> None:
+    """Show a download failure with the fork's GitHub releases link."""
     dialog = QDialog(self)
-    dialog.setWindowTitle("Mirror 下载")
+    dialog.setWindowTitle("English installer download")
     dialog.setMinimumWidth(460)
     if hasattr(self, "_current_style_sheet"):
         dialog.setStyleSheet(self._current_style_sheet())
@@ -513,7 +463,7 @@ def _show_mirror_project_download_dialog(self: Any, summary: str) -> None:
     message = QLabel(summary)
     message.setWordWrap(True)
     layout.addWidget(message)
-    link = QLabel(_mirror_project_link_text("尝试下载"))
+    link = QLabel(_update_project_link_text("尝试下载"))
     link.setWordWrap(True)
     link.setTextFormat(Qt.TextFormat.RichText)
     link.setOpenExternalLinks(True)
@@ -542,7 +492,7 @@ def _show_update_dialog(self, info, manual=False):
 def _show_update_failure_netdisk_prompt(self, detail=""):
     box = QMessageBox(self)
     box.setWindowTitle("检查更新失败")
-    box.setText("Mirror 酱更新服务请求失败，请稍后重试。")
+    box.setText(UPDATE_FAILURE_MESSAGE)
     if detail:
         box.setInformativeText(str(detail))
     box.addButton("确定", QMessageBox.AcceptRole)
@@ -715,13 +665,11 @@ class UpdateControllerMixin:
     _show_netdisk_download_dialog = _show_netdisk_download_dialog
     _open_url = _open_url
     _is_newer_version = _is_newer_version
-    _mirror_cdk_value = _mirror_cdk_value
-    _save_mirror_cdk = _save_mirror_cdk
-    _start_mirror_download = _start_mirror_download
-    _on_mirror_download_ready = _on_mirror_download_ready
-    _start_mirror_installer_download = _start_mirror_installer_download
-    _on_mirror_download_progress = _on_mirror_download_progress
-    _on_mirror_installer_downloaded = _on_mirror_installer_downloaded
-    _on_mirror_installer_download_error = _on_mirror_installer_download_error
-    _finish_mirror_download_ui = _finish_mirror_download_ui
-    _launch_mirror_installer = _launch_mirror_installer
+    _start_update_download = _start_update_download
+    _on_update_download_ready = _on_update_download_ready
+    _start_update_installer_download = _start_update_installer_download
+    _on_update_download_progress = _on_update_download_progress
+    _on_update_installer_downloaded = _on_update_installer_downloaded
+    _on_update_installer_download_error = _on_update_installer_download_error
+    _finish_update_download_ui = _finish_update_download_ui
+    _launch_update_installer = _launch_update_installer

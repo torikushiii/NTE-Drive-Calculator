@@ -1,5 +1,5 @@
-# 检查 Mirror 酱资源更新并显示版本更新弹窗。
-"""MirrorChyan update API integration and update-dialog helpers."""
+# 检查英文分支的 GitHub 发行版并显示更新弹窗。
+"""Fork-only GitHub release checks and update-dialog helpers."""
 
 from __future__ import annotations
 
@@ -10,18 +10,17 @@ import re
 import tempfile
 import urllib.error
 import urllib.request
-from urllib.parse import urlencode
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QCheckBox, QDialog, QFrame, QHBoxLayout, QLabel, QPushButton, QTextBrowser, QVBoxLayout
 
-from src.app.constants import NETDISK_DOWNLOAD_LINKS
+from src.app.constants import GITHUB_RELEASES_URL
 from src.app.version import version_order_key
 from src.app.theme import themed_style
 from src.app.window_geometry import fit_dialog_to_available_screen
 
-UPDATE_FAILURE_MESSAGE = "Mirror 酱更新服务请求失败，请稍后重试。"
+UPDATE_FAILURE_MESSAGE = "GitHub update check failed. Please try again later."
 UPDATE_CHECK_TIMEOUT_SECONDS = 5
 UPDATE_DOWNLOAD_TIMEOUT_SECONDS = 30
 _UPDATE_DOWNLOAD_CHUNK_SIZE = 128 * 1024
@@ -32,33 +31,28 @@ class UpdateDownloadCancelled(RuntimeError):
 
 
 def is_newer_version(remote, current) -> bool:
-    return version_order_key(remote) > version_order_key(current)
+    return _update_version_key(remote) > _update_version_key(current)
 
 
-def mirror_update_request_url(api_url: str, app_version: str, cdk: str = "") -> str:
-    """Build the documented Mirror API request without logging the CDK."""
-    params = {"current_version": str(app_version).strip()}
-    if str(cdk).strip():
-        params["cdk"] = str(cdk).strip()
-    return f"{api_url}?{urlencode(params)}"
+def _update_version_key(version: str) -> tuple[int, ...]:
+    revision = re.search(r"-english\.(\d+)$", str(version))
+    return (*version_order_key(version), int(revision[1]) if revision else 0)
 
 
 def fetch_update_info(
     api_url: str,
     app_version: str,
     *,
-    cdk: str = "",
     timeout: int = UPDATE_CHECK_TIMEOUT_SECONDS,
 ) -> dict:
-    """Read one Mirror resource response.
-
-    ``data.url`` is a short-lived download URL.  It is intentionally kept out
-    of account settings and logs; it is only opened when the user explicitly
-    requests a download.
-    """
+    """Find a published English installer, including prereleases, in this fork."""
     request = urllib.request.Request(
-        mirror_update_request_url(api_url, app_version, cdk),
-        headers={"User-Agent": f"NTE-Drive-Calc/{app_version}", "Accept": "application/json"},
+        api_url,
+        headers={
+            "User-Agent": f"NTE-Drive-Calc-English/{app_version}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
     )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -66,7 +60,7 @@ def fetch_update_info(
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         return {
             "has_release": False, "newer": False, "url": "", "message": UPDATE_FAILURE_MESSAGE,
-            "error": f"Mirror 酱响应不是有效 JSON：{exc}",
+            "error": f"Invalid GitHub release response: {exc}",
         }
     except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
         return {
@@ -74,38 +68,44 @@ def fetch_update_info(
             "error": str(exc),
         }
 
-    if not isinstance(payload, dict):
+    if not isinstance(payload, list):
         return {
             "has_release": False, "newer": False, "url": "", "message": UPDATE_FAILURE_MESSAGE,
-            "error": "Mirror 酱响应不是对象。",
+            "error": "GitHub release response is not a list.",
         }
-    code = payload.get("code")
-    if code != 0:
+    available = []
+    for release in payload:
+        if not isinstance(release, dict) or release.get("draft"):
+            continue
+        tag = str(release.get("tag_name") or "")
+        if not re.fullmatch(r"v?\d+\.\d+\.\d+-english\.\d+", tag):
+            continue
+        version = tag.removeprefix("v")
+        assets = release.get("assets")
+        if not isinstance(assets, list):
+            continue
+        for asset in assets:
+            if not isinstance(asset, dict) or asset.get("state") != "uploaded":
+                continue
+            url = str(asset.get("browser_download_url") or "")
+            if (asset.get("name") != f"NTE_Drive_Calc_English_Setup_{version}.exe"
+                    or not url.startswith(f"{GITHUB_RELEASES_URL}/download/{tag}/")):
+                continue
+            available.append({
+                "has_release": True,
+                "latest": version,
+                "newer": is_newer_version(version, app_version),
+                "url": url,
+                "release_url": f"{GITHUB_RELEASES_URL}/tag/{tag}",
+                "message": str(release.get("body") or "").strip(),
+                "name": str(release.get("name") or version),
+            })
+    if not available:
         return {
-            "has_release": False,
-            "newer": False,
-            "url": "",
-            "message": str(payload.get("msg") or "Mirror 酱未返回可用更新信息。"),
-            "error": f"Mirror 酱错误码：{code}",
+            "has_release": False, "newer": False, "url": "",
+            "message": "No English installer has been published yet.",
         }
-    data = payload.get("data") or {}
-    if not isinstance(data, dict):
-        data = {}
-    latest = str(data.get("version_name") or "").strip()
-    if not latest:
-        return {
-            "has_release": False, "newer": False, "url": "", "message": UPDATE_FAILURE_MESSAGE,
-            "error": "Mirror 酱响应缺少 version_name。",
-        }
-    return {
-        "has_release": True,
-        "latest": latest,
-        "newer": is_newer_version(latest, app_version),
-        "url": str(data.get("url") or "").strip(),
-        "release_url": "",
-        "message": str(data.get("release_note") or "").strip(),
-        "name": latest,
-    }
+    return max(available, key=lambda info: _update_version_key(info["latest"]))
 
 
 def download_update_installer(
@@ -116,14 +116,9 @@ def download_update_installer(
     progress_callback=None,
     cancel_check=None,
 ) -> dict:
-    """Download a Mirror installer to a temporary directory.
-
-    The URL returned by Mirror is short-lived, so the file is deliberately not
-    stored in account settings.  A partial file is never launched and is
-    removed if downloading fails or is cancelled.
-    """
+    """Download an installer without retaining failed or cancelled partial files."""
     if not str(url).strip().lower().startswith(("https://", "http://")):
-        raise ValueError("Mirror 下载地址无效。")
+        raise ValueError("Invalid installer download URL.")
     if cancel_check and cancel_check():
         raise UpdateDownloadCancelled("已取消更新下载安装包。")
 
@@ -290,23 +285,15 @@ def show_update_dialog(parent, style_sheet: str, info: dict, app_version: str) -
     later_button = QPushButton("暂不更新")
     later_button.clicked.connect(dialog.accept)
     later_button.setDefault(True)
-    netdisk_button = QPushButton("网盘下载")
-    netdisk_button.setObjectName("btnNew")
-    mirror_button = QPushButton("Mirror 下载")
+    download_button = QPushButton("Download English installer")
 
-    def open_netdisk_download():
+    def start_update_download():
         dialog.accept()
-        getattr(parent, "_show_netdisk_download_dialog")(NETDISK_DOWNLOAD_LINKS)
+        getattr(parent, "_start_update_download")()
 
-    def start_mirror_download():
-        dialog.accept()
-        getattr(parent, "_start_mirror_download")()
-
-    netdisk_button.clicked.connect(open_netdisk_download)
-    mirror_button.clicked.connect(start_mirror_download)
+    download_button.clicked.connect(start_update_download)
     footer.addWidget(later_button)
-    footer.addWidget(mirror_button)
-    footer.addWidget(netdisk_button)
+    footer.addWidget(download_button)
     layout.addLayout(footer)
     fitted = fit_dialog_to_available_screen(dialog, QSize(780, 600))
     notes.setMinimumHeight(min(300, max(140, fitted.height() - 285)))

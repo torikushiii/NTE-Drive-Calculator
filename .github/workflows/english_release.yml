@@ -1,0 +1,116 @@
+name: Build English Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the installer as a GitHub prerelease
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: english-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'torikushiii/NTE-Drive-Calculator-English'
+    runs-on: windows-2022
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      PYTHONUTF8: "1"
+      UV_NO_PROGRESS: "1"
+      UV_LINK_MODE: copy
+
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          version: "0.11.6"
+          python-version: "3.11"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install locked build dependencies
+        run: uv sync --locked --no-default-groups --group build
+
+      - name: Install Inno Setup 6
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-6.5.4.exe'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_5_4/innosetup-6.5.4.exe' -OutFile $installer
+          $expected = 'fa73bf47a4da250d185d07561c2bfda387e5e20db77e4570004cf6a133cc10b1'
+          if ((Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected) {
+            throw 'Inno Setup installer checksum mismatch'
+          }
+          $destination = Join-Path $env:RUNNER_TEMP 'InnoSetup'
+          $process = Start-Process $installer -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$destination" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Inno Setup installation failed: $($process.ExitCode)" }
+          "INNO_SETUP_ISCC=$destination\ISCC.exe" >> $env:GITHUB_ENV
+
+      - name: Build and validate app bundle and installer
+        run: uv run --no-sync python build_installer.py
+
+      - name: Prepare release assets and checksums
+        id: release
+        run: |
+          $version = uv run --no-sync python -c 'from src.app.version import ENGLISH_RELEASE_VERSION; print(ENGLISH_RELEASE_VERSION)'
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read English release version' }
+          $base = uv run --no-sync python -c 'from src.app.version import __version__; print(__version__)'
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read application version' }
+          $directory = New-Item -ItemType Directory -Path release-assets
+          $name = "NTE_Drive_Calc_English_Setup_$version.exe"
+          Copy-Item "installer/output/NTE_Drive_Calc_Setup_$base.exe" (Join-Path $directory $name)
+          $digest = (Get-FileHash (Join-Path $directory $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$digest  $name" | Set-Content (Join-Path $directory 'SHA256SUMS.txt') -Encoding ascii
+          @{
+            version = $version
+            commit = $env:GITHUB_SHA
+            repository = $env:GITHUB_REPOSITORY
+            run = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          } | ConvertTo-Json | Set-Content (Join-Path $directory 'build-info.json') -Encoding utf8NoBOM
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: English-Windows-installer
+          path: release-assets/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Publish English prerelease
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          $notes = @"
+          English edition of NTE Drive Calc: $env:RELEASE_VERSION.
+
+          Download the NTE_Drive_Calc_English_Setup_*.exe asset below for Windows 10/11 x64.
+          The installer and app default to English. Existing upstream installations are kept separate.
+          Downloads and update checks use this fork, not upstream mirrors.
+
+          The in-game OCR scanner still requires Simplified Chinese game text.
+          This is a prerelease: packaging checks passed, but interactive Windows/game acceptance and the full test suite have not been run.
+          The installer is not code-signed. Bundled components retain their upstream licenses and notices.
+
+          Source commit: $env:GITHUB_SHA
+          "@
+          gh release create $env:RELEASE_TAG ./release-assets/* --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "NTE Drive Calc English $env:RELEASE_VERSION" --notes $notes --draft --prerelease
+          if ($LASTEXITCODE -ne 0) { throw 'Release creation or asset upload failed' }
+          gh release edit $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --draft=false
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
