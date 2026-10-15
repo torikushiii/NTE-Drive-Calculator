@@ -42,7 +42,16 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
+      - name: Prepare vgamepad without interactive driver installation
+        timeout-minutes: 5
+        run: |
+          uv venv --python 3.11
+          if ($LASTEXITCODE -ne 0) { throw 'Virtual environment creation failed' }
+          uv run --no-project --with setuptools==80.9.0 --with wheel==0.45.1 python tools/release/prepare_vgamepad.py --python .venv/Scripts/python.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Non-interactive vgamepad preparation failed' }
+
       - name: Install locked build dependencies
+        timeout-minutes: 10
         run: uv sync --locked --no-default-groups --group build
 
       - name: Install Inno Setup 6
